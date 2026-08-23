@@ -1,0 +1,26 @@
+# Local tooling
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+coverage/
+*.log
+
+# Credentials never enter the tree
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
