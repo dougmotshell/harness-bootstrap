@@ -10,7 +10,7 @@ irmão en-US abre com um ponteiro para ele.
 |---|---|---|
 | [`architecture/`](pt-br/architecture/) | C4 | [contexto](pt-br/architecture/01-context.md) · [containers](pt-br/architecture/02-container.md) |
 | [`specs/`](pt-br/specs/) | SDD | [bootstrap de projetos](pt-br/specs/bootstrap-de-projetos.md) |
-| [`decisions/`](pt-br/decisions/) | ADR (MADR) | [0001 copiar templates](pt-br/decisions/0001-copiar-templates-em-vez-de-gerar.md) · [0002 harness-score](pt-br/decisions/0002-harness-score-como-metrica.md) |
+| [`decisions/`](pt-br/decisions/) | ADR (MADR) | [0001 copiar templates](pt-br/decisions/0001-copiar-templates-em-vez-de-gerar.md) · [0002 harness-score](pt-br/decisions/0002-harness-score-como-metrica.md) · [0003 merge por arquivo](pt-br/decisions/0003-merge-por-arquivo-em-projeto-existente.md) |
 | [`manual/`](pt-br/manual/) | manual do usuário | [uso no dia a dia](pt-br/manual/index.md) · [tipos de projeto](pt-br/manual/tipos-de-projeto.md) |
 
 ## Deliberadamente ausente
