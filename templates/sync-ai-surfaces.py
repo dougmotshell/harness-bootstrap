@@ -27,6 +27,12 @@ Usage:
     python3 scripts/sync-ai-surfaces.py --check     write nothing; exit 1 on drift
     python3 scripts/sync-ai-surfaces.py --dry-run   write nothing; list what would change
     python3 scripts/sync-ai-surfaces.py --prune      also delete orphaned outputs
+    python3 scripts/sync-ai-surfaces.py --force      overwrite a hand-authored path
+
+Outputs are recognised by their `managed-by:` banner. A file under a generated root
+without it was written by hand: the generator keeps it, never prunes it, and refuses
+(exit 2) to project a source over it. Safe to point at a project that already has
+its own `.claude/skills/`.
 
 `--check` is for CI: it fails when someone hand-edited an output or forgot to run
 the generator after touching a source.
@@ -76,6 +82,52 @@ TRANSLATION_SUFFIX = re.compile(r"\.[a-z]{2}-[A-Z]{2}$")
 
 def is_translation(path: Path) -> bool:
     return bool(TRANSLATION_SUFFIX.search(path.stem))
+
+
+# --- ownership -------------------------------------------------------------
+
+# Every generated file opens with the banner. The project name inside it is NOT part
+# of the test, so a clone in a differently named directory still recognises its own
+# outputs. A file under a generated root without the banner was written by hand: it
+# is foreign, and this generator neither overwrites nor deletes it. That distinction
+# is what makes the tool safe to point at a project that already has a `.claude/`.
+BANNER_MARK = "managed-by:"
+BANNER_TOOL = "sync-ai-surfaces"
+
+
+def is_generated(data: bytes) -> bool:
+    head = data[:1024].decode("utf-8", errors="replace")
+    return BANNER_MARK in head and BANNER_TOOL in head
+
+
+def owner_marker(rel: Path) -> Path | None:
+    """
+    The file whose banner decides ownership of `rel`, when `rel` itself cannot carry
+    one. A skill's companion files (references/, data, images) are copied byte for
+    byte, so a banner would corrupt them; the `SKILL.md` they travel with answers for
+    the whole directory instead.
+    """
+    parts = rel.parts
+    for base in (".claude/skills", ".agents/skills"):
+        head = tuple(base.split("/"))
+        if parts[: len(head)] == head and len(parts) > len(head) + 1:
+            return Path(*head, parts[len(head)], "SKILL.md")
+    return None
+
+
+def is_ours(rel: Path, current: bytes | None) -> bool:
+    """True when the generator may write over `rel`."""
+    if current is None:
+        return True
+    if is_generated(current):
+        return True
+    marker = owner_marker(rel)
+    if marker is None:
+        return False
+    # A companion file inside a skill directory we already own is ours too; inside a
+    # hand-authored one it is not.
+    holder = ROOT / marker
+    return not holder.is_file() or is_generated(holder.read_bytes())
 
 
 # --- frontmatter -----------------------------------------------------------
@@ -284,17 +336,30 @@ def project() -> dict[Path, bytes]:
 # --- execution -------------------------------------------------------------
 
 
-def find_orphans(expected: dict[Path, bytes]) -> list[Path]:
-    """Generated output with no matching source: leftover from a rename."""
+def classify_extra(expected: dict[Path, bytes]) -> tuple[list[Path], list[Path]]:
+    """
+    Files under a generated root that no source accounts for, split by who wrote them:
+
+    orphan   carries the banner — this generator wrote it and the source is gone
+             (a rename). Safe to delete with `--prune`.
+    foreign  no banner — a human put it there. Never pruned. It is not an error:
+             a hand-authored skill and a generated one coexist fine. To bring it
+             under the generator, move it to `skills/<n>/SKILL.md` and re-run.
+    """
     orphans: list[Path] = []
+    foreign: list[Path] = []
     for generated_root in GENERATED_ROOTS:
         base = ROOT / generated_root
         if not base.exists():
             continue
         for path in base.rglob("*"):
-            if path.is_file() and path.relative_to(ROOT) not in expected:
-                orphans.append(path.relative_to(ROOT))
-    return sorted(orphans)
+            if not path.is_file():
+                continue
+            rel = path.relative_to(ROOT)
+            if rel in expected:
+                continue
+            (orphans if is_ours(rel, path.read_bytes()) else foreign).append(rel)
+    return sorted(orphans), sorted(foreign)
 
 
 def main() -> int:
@@ -307,23 +372,32 @@ def main() -> int:
                     help="write nothing; list what would change")
     ap.add_argument("--prune", action="store_true",
                     help="delete orphaned outputs instead of only reporting them")
+    ap.add_argument("--force", action="store_true",
+                    help="overwrite a hand-authored file sitting at a generated path")
     args = ap.parse_args()
     read_only = args.check or args.dry_run
 
     expected = project()
     drifted: list[tuple[str, Path]] = []
+    collisions: list[Path] = []
 
     for rel, content in sorted(expected.items()):
         target = ROOT / rel
         current = target.read_bytes() if target.is_file() else None
         if current == content:
             continue
+        if not is_ours(rel, current) and not args.force:
+            # A hand-authored file occupies a path a source claims. Refusing is the
+            # only safe answer: the two cannot both live there, and the generator is
+            # not entitled to pick. Rename either side, or pass --force.
+            collisions.append(rel)
+            continue
         drifted.append(("stale" if current is not None else "missing", rel))
         if not read_only:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
 
-    orphans = find_orphans(expected)
+    orphans, foreign = classify_extra(expected)
     if orphans and args.prune and not read_only:
         for rel in orphans:
             (ROOT / rel).unlink()
@@ -338,6 +412,17 @@ def main() -> int:
     for rel in orphans:
         tail = "removed" if args.prune and not read_only else "no source — use --prune"
         print(f"  {'orphan':9} {rel}  ({tail})")
+    for rel in foreign:
+        print(f"  {'foreign':9} {rel}  (hand-authored — kept; adopt it by moving it "
+              f"to an authored source)")
+    for rel in collisions:
+        print(f"  {'conflict':9} {rel}  (hand-authored file at a generated path — "
+              f"rename one side, or --force)")
+
+    if collisions:
+        print(f"\n{len(collisions)} conflict(s): nothing was written over. A source "
+              "projects onto a path a human already owns.")
+        return 2
 
     if args.check:
         if drifted or orphans:
