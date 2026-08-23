@@ -112,7 +112,7 @@ sequenceDiagram
 
 ## Plano de teste
 
-Automatizado em `tests/` (22 casos, stdlib, `make test`), com estas âncoras de saída
+Automatizado em `tests/` (32 casos, stdlib, `make test`), com estas âncoras de saída
 real:
 
 - projeto novo → `36 written or merged`, 44 arquivos no total após o gerador;
@@ -124,7 +124,11 @@ real:
   `gate-write.sh`;
 - posse do gerador → skill à mão sobrevive a `--prune`; órfão com banner é podado;
   colisão sai 2 sem escrever; asset companheiro continua sincronizando;
-- `--dry-run` → não escreve;
+- `--dry-run` → não escreve, na instalação e na remoção;
+- remoção → projeto novo volta a diretório vazio; projeto que já existia volta com
+  cada arquivo seu byte a byte igual, e o JSON igual no dado;
+- remoção → arquivo editado depois do bootstrap fica, skill à mão sob caminho gerado
+  fica, `--force` leva os dois;
 - paridade `pt-br`/`en-us` → `diff` vazio;
 - `find docs -type d -name '*[A-Z]*'` → vazio;
 - `make sync-check` → `8 generated file(s) up to date`;

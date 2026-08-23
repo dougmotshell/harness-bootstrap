@@ -20,6 +20,13 @@ Sempre comece pelo plano:
 python3 scripts/init-project.py ../alvo --dry-run
 ```
 
+Sem o repositório clonado, os exemplos abaixo viram o mesmo comando pelo pipe — o
+primeiro argumento é o alvo, o resto vai para o `init-project.py`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dougmotshell/harness-bootstrap/main/install.sh | sh -s -- . --dry-run
+```
+
 ## Como cada arquivo é tratado
 
 Nenhum arquivo é sobrescrito, truncado ou apagado, em nenhum modo. O que muda é o que

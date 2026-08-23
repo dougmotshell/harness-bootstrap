@@ -7,11 +7,20 @@ artesanal, sensores por stack — veja
 
 ## Instalar
 
-Só Python 3.12 da stdlib. Nada para instalar.
+Só Python 3.12 da stdlib. Nada para instalar. De dentro do projeto-alvo, sem clonar:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dougmotshell/harness-bootstrap/main/install.sh | sh
+```
+
+Com clone, para trabalhar nos templates:
 
 ```bash
 git clone <url> ~/www/harness-bootstrap
 ```
+
+Detalhes das duas direções — variáveis, requisitos, e como remover o harness de volta —
+em [instalar e remover](instalar-e-remover.md).
 
 Para ter o comando de julgamento em qualquer projeto, instale o prompt no nível de
 usuário e preencha o caminho do repositório dentro dele:
@@ -50,6 +59,9 @@ verifica com `npx harness-score`.
 
 ### Auditar um projeto já preparado
 
+O placar do harness-score e o gate em CI estão em
+[verificar o harness](verificar-harness.md).
+
 ```bash
 python3 scripts/init-project.py ../meu-projeto --check ; echo "exit=$?"
 ```
@@ -80,7 +92,7 @@ decida caso a caso; o script nunca sobrescreve nada por conta própria.
 ### Rodar os testes deste repositório
 
 ```bash
-make test        # 22 testes de stdlib: projeto novo, projeto existente, posse do gerador
+make test        # 32 testes de stdlib: projeto novo, projeto existente, remoção, posse do gerador
 make fixtures    # semeia os dois cenários em /tmp para inspecionar à mão
 ```
 
