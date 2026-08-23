@@ -24,6 +24,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 INIT = REPO / "scripts/init-project.py"
+UNINSTALL = REPO / "scripts/uninstall-project.py"
 
 
 def run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -34,6 +35,10 @@ def run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]
 
 def bootstrap(target: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return run(str(INIT), str(target), *extra)
+
+
+def uninstall(target: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    return run(str(UNINSTALL), str(target), *extra)
 
 
 def sync(target: Path, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -261,11 +266,86 @@ class Refusals(Fixture):
         self.assertNotEqual(proc.returncode, 0)
 
 
+class Uninstall(Fixture):
+    """The reverse direction, judged on the one property that matters: a project that
+    never asked for the harness must come back exactly as it was."""
+
+    def test_greenfield_round_trip_leaves_nothing(self) -> None:
+        bootstrap(self.target)
+        proc = uninstall(self.target)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(tree(self.target), {}, "the bootstrap left files behind")
+        self.assertEqual(list(self.target.iterdir()), [], "empty directories were left behind")
+
+    def test_dry_run_writes_nothing(self) -> None:
+        bootstrap(self.target)
+        before = tree(self.target)
+        proc = uninstall(self.target, "--dry-run")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("would remove", proc.stdout)
+        self.assertEqual(before, tree(self.target))
+
+    def test_brownfield_round_trip_restores_the_project(self) -> None:
+        self.write("package.json", '{"name": "legacy"}\n')
+        self.write("Makefile", ".PHONY: test\ntest:\n\tnpm test\n")
+        self.write(".gitignore", "node_modules/\n")
+        self.write("CLAUDE.md", "# Legacy\n\nRode `npm test`.\n")
+        self.write("README.md", "# Legacy\n")
+        self.write(".github/workflows/ci.yml", "name: legacy\non: push\njobs: {}\n")
+        before = tree(self.target)
+
+        bootstrap(self.target)
+        uninstall(self.target)
+        after = tree(self.target)
+
+        self.assertEqual(sorted(after), sorted(before), "the project gained or lost a file")
+        for rel in sorted(before):
+            self.assertEqual(after[rel], before[rel], f"{rel} came back changed")
+
+    def test_json_comes_back_semantically_equal(self) -> None:
+        """The merge reformats JSON, so the round trip is judged on the data, not on
+        the bytes — and an emptied container the project owned is not dropped."""
+        self.write(".claude/settings.json", '{"permissions": {"allow": ["Bash(npm test)"]}}\n')
+        self.write(".mcp.json", '{"mcpServers": {}}\n')
+        bootstrap(self.target)
+        uninstall(self.target)
+        self.assertEqual(
+            json.loads(self.read(".claude/settings.json")),
+            {"permissions": {"allow": ["Bash(npm test)"]}},
+        )
+        self.assertEqual(json.loads(self.read(".mcp.json")), {"mcpServers": {}})
+
+    def test_keeps_what_the_project_edited(self) -> None:
+        bootstrap(self.target)
+        self.write("AGENTS.md", "# Written by hand after the bootstrap\n")
+        proc = uninstall(self.target)
+        self.assertIn("kept", proc.stdout)
+        self.assertTrue((self.target / "AGENTS.md").is_file(), "an edited file was deleted")
+        self.assertIn("hand", self.read("AGENTS.md"))
+
+    def test_force_removes_even_the_edited_ones(self) -> None:
+        bootstrap(self.target)
+        self.write("AGENTS.md", "# Written by hand after the bootstrap\n")
+        uninstall(self.target, "--force")
+        self.assertFalse((self.target / "AGENTS.md").exists())
+
+    def test_keeps_a_hand_authored_file_under_a_generated_root(self) -> None:
+        bootstrap(self.target)
+        self.write(".claude/commands/mine.md", "# not generated\n")
+        uninstall(self.target)
+        self.assertTrue((self.target / ".claude/commands/mine.md").is_file())
+
+    def test_refuses_to_uninstall_itself(self) -> None:
+        proc = uninstall(REPO)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("itself", proc.stderr + proc.stdout)
+
+
 class Installer(unittest.TestCase):
     """The curl-pipe installer. Both cases are offline: the target check comes before
     the download, so a typo costs nothing and the test needs no network."""
 
-    SCRIPTS = ("install.sh",)
+    SCRIPTS = ("install.sh", "uninstall.sh")
 
     def test_are_valid_posix_sh(self) -> None:
         for name in self.SCRIPTS:
