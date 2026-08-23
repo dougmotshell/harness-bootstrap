@@ -23,7 +23,10 @@ three hooks, `scripts/sync-ai-surfaces.py`, one example agent / skill / rule,
 `memory/MEMORY.md`, and `docs/` in `pt-br` and `en-us` with the four trees. Then it ran
 the surface generator.
 
-That lands the project at **L2 · Guided, 83/106** on
+In a project that already had its own `Makefile`, `CLAUDE.md` or `.claude/`, some of
+those were merged rather than created — read the run's report before assuming which.
+
+A fresh project lands at **L2 · Guided, 83/106** on
 [harness-score](https://github.com/paladini/harness-score). Everything below is the
 climb to L4, and none of it can be templated.
 
@@ -31,13 +34,24 @@ climb to L4, and none of it can be templated.
 
 ```bash
 python3 TEMPLATES_REPO/scripts/init-project.py . --dry-run   # see the plan
-python3 TEMPLATES_REPO/scripts/init-project.py .             # write
-python3 TEMPLATES_REPO/scripts/init-project.py . --check     # audit; exit 1 if incomplete
+python3 TEMPLATES_REPO/scripts/init-project.py .             # write and merge
+python3 TEMPLATES_REPO/scripts/init-project.py . --check     # audit; exit 1 if not wired
 ```
 
-An existing file is never overwritten — the script reports it as `exists` and moves on.
-If the project already has a contract, run `--check` and report the gap instead of
-scaffolding over it. Migrating is a separate, explicit request.
+Existing content is never overwritten. What varies is how each file is reached: the
+`Makefile` gains only the targets the project does not define, `.claude/settings.json`
+and `.mcp.json` are key-merged, `CLAUDE.md` gains `@AGENTS.md` on line 1,
+`.gitignore` and `.env.example` gain one delimited block, the workflow lands as
+`harness.yml` beside an existing `ci.yml`, and `.pre-commit-config.yaml` is left alone
+with the snippet printed for a human to paste — that last one is yours to apply.
+
+`--check` audits CONTENT, not paths: `incomplete — needs ...` means the file is there and
+the harness is not wired through it. Run it after writing and act on every line.
+
+The generator recognises its own output by the `managed-by:` banner. A file without it is
+`foreign` (kept, never pruned) or `conflict` (exit 2, nothing written). Never pass
+`--force`, and never `git mv` a hand-authored skill into `skills/` unless the user asked
+for that adoption.
 
 If only `CLAUDE.md` exists, offer the built-ins first: `/init` (with
 `CLAUDE_CODE_NEW_INIT=1`) reads `AGENTS.md`, Cursor and Copilot rules; `/import` carries
@@ -55,6 +69,10 @@ the tool config the check actually looks for:
 | `lint` | linter config | `ruff check .` | `eslint .` | `golangci-lint run` |
 | `typecheck` | strict config | `mypy --strict .` | `tsc --noEmit` | native |
 | `format` | formatter config | `ruff format .` | `prettier -w .` | `gofmt -w .` |
+
+Rust, PHP and .NET recipes are in
+`TEMPLATES_REPO/docs/pt-br/manual/tipos-de-projeto.md`, together with the monorepo and
+adoption cases. If a target the project already defines does the job, leave it alone.
 
 Also fill `lint-file` / `format-file` — the `PostToolUse` hook stays silent until they
 leave their TODO stub. No manifest ⇒ leave the targets failing and say so; a sensor that

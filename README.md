@@ -12,9 +12,15 @@ Um comando prepara um projeto novo do zero até **L2 · Guided (83/106)** no
 python3 scripts/init-project.py ../meu-projeto
 ```
 
+Serve igualmente a um projeto que já existe: cada arquivo declara o merge que sobrevive
+ao que já está lá — o `Makefile` ganha só os alvos ausentes, o `settings.json` é
+mesclado por chave, o `CLAUDE.md` ganha `@AGENTS.md` na linha 1. Nada é sobrescrito, e
+`--check` afere conteúdo, não a existência do caminho. Ver
+[usar em diferentes tipos de projeto](docs/pt-br/manual/tipos-de-projeto.md).
+
 ## O que ele instala
 
-35 arquivos, em três camadas:
+36 arquivos, em três camadas:
 
 | Camada | O que é | Onde |
 |---|---|---|
@@ -39,12 +45,26 @@ Ver [ADR 0001](docs/pt-br/decisions/0001-copiar-templates-em-vez-de-gerar.md).
 
 ```bash
 python3 scripts/init-project.py ../meu-projeto --dry-run   # ver o plano
-python3 scripts/init-project.py ../meu-projeto             # escrever
-python3 scripts/init-project.py ../meu-projeto --check     # auditar; sai 1 se faltar algo
+python3 scripts/init-project.py ../meu-projeto             # escrever e mesclar
+python3 scripts/init-project.py ../meu-projeto --check     # auditar; sai 1 se não estiver ligado
 ```
 
-Não destrutivo sem exceção: arquivo existente é reportado como `exists` e nunca
-sobrescrito. Rode duas vezes e a segunda não escreve nada.
+Não destrutivo sem exceção: conteúdo existente nunca é sobrescrito, truncado ou apagado.
+Idempotente de verdade — a terceira execução deixa a árvore idêntica à primeira, em
+projeto novo e em projeto que já existia.
+
+| Modo | Arquivos | Destino já existe → |
+|---|---|---|
+| `whole` | `AGENTS.md`, `README.md`, `LICENSE`, `docs/**`, hooks | não toca |
+| `block` | `.gitignore`, `.env.example` | acrescenta um bloco delimitado, uma vez |
+| `make` | `Makefile` | acrescenta só os alvos que o projeto não define |
+| `json` | `.claude/settings.json`, `.mcp.json` | mescla chaves; hooks casados por `command` |
+| `import` | `CLAUDE.md`, `.github/copilot-instructions.md` | garante `@AGENTS.md` na linha 1 |
+| `advise` | `.pre-commit-config.yaml` | não toca e imprime o trecho a colar |
+| ao lado | `.github/workflows/ci.yml` | escreve `harness.yml` ao lado |
+
+`--check` audita **conteúdo**: distingue `missing` de `incomplete — needs ...`. Hook no
+disco que nenhum `settings.json` chama é arquivo morto, e é o que essa auditoria pega.
 
 Depois, no projeto-alvo, o comando `/bootstrap-ai-harness` faz a parte que o script não
 faz: detectar a stack, preencher os quatro alvos de sensor do `Makefile`, completar o
@@ -70,7 +90,15 @@ Números medidos com `harness-score v1.6.3`, não estimados.
 | `templates/` | 30 templates — [manifesto](templates/README.md) |
 | `templates/harness/` | hooks, sensores, CI, higiene — [detalhe e mapa dos 36 checks](templates/harness/README.md) |
 | `bootstrap-ai-harness.prompt.md` | o comando que faz a parte de julgamento |
+| `tests/` | 22 testes golden, stdlib, `make test` — projeto novo, projeto existente, posse do gerador |
 | `docs/` | arquitetura (C4), specs (SDD), decisões (ADR) e manual, em `pt-br/` e `en-us/` |
+
+## Testes
+
+```bash
+make test        # 22 casos, só stdlib, sem passo de instalação
+make fixtures    # semeia os dois cenários em /tmp para inspecionar à mão
+```
 
 ## Aviso
 
