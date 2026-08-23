@@ -507,7 +507,8 @@ def main() -> int:
         "     that is what unlocks L3/L4 in harness-score, not the hooks.\n"
         "  3. Rename the example agent, skill and rule to something this project needs.\n"
         "  4. pre-commit install\n"
-        "  5. python3 scripts/init-project.py . --check   # is it actually wired?\n"
+        "  5. Re-run the bootstrap with --check to confirm the harness is wired:\n"
+        "     curl -fsSL https://raw.githubusercontent.com/dougmotshell/harness-bootstrap/main/install.sh | sh -s -- . --check\n"
         "  6. npx harness-score                           # baseline"
     )
     if code == 2:

@@ -261,5 +261,30 @@ class Refusals(Fixture):
         self.assertNotEqual(proc.returncode, 0)
 
 
+class Installer(unittest.TestCase):
+    """The curl-pipe installer. Both cases are offline: the target check comes before
+    the download, so a typo costs nothing and the test needs no network."""
+
+    SCRIPTS = ("install.sh",)
+
+    def test_are_valid_posix_sh(self) -> None:
+        for name in self.SCRIPTS:
+            proc = subprocess.run(
+                ["sh", "-n", str(REPO / name)], capture_output=True, text=True, check=False
+            )
+            self.assertEqual(proc.returncode, 0, f"{name}: {proc.stderr}")
+
+    def test_refuse_a_missing_target_before_downloading(self) -> None:
+        for name in self.SCRIPTS:
+            with tempfile.TemporaryDirectory() as tmp:
+                proc = subprocess.run(
+                    ["sh", str(REPO / name), str(Path(tmp) / "nope")],
+                    capture_output=True, text=True, check=False,
+                )
+            self.assertNotEqual(proc.returncode, 0, name)
+            self.assertIn("not an existing directory", proc.stderr, name)
+            self.assertNotIn("fetching", proc.stdout, name)
+
+
 if __name__ == "__main__":
     unittest.main()
