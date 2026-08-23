@@ -1,7 +1,7 @@
 # Sensors of this repository. The templates ship a richer version; here only what
 # there is to measure: a bootstrap with no dependencies and no install step.
 .DEFAULT_GOAL := help
-.PHONY: help test fixtures
+.PHONY: help test fixtures harness harness-gate verify
 
 help:  ## List the targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -17,3 +17,13 @@ fixtures:  ## Bootstrap both fixtures into /tmp to inspect the output by hand
 	@printf '# Projeto\n' > /tmp/harness-fixture-existing/CLAUDE.md
 	python3 scripts/init-project.py /tmp/harness-fixture-new
 	python3 scripts/init-project.py /tmp/harness-fixture-existing
+
+harness:  ## Score this harness (36 checks, 108 points, L0-L4) with harness-score
+	npx -y harness-score
+
+harness-gate:  ## Same scan as a gate: fails below MIN_LEVEL (default 3)
+	npx -y harness-score --min-level $(or $(MIN_LEVEL),3)
+
+verify:  ## Everything a reviewer would run: tests, then the score
+	$(MAKE) test
+	$(MAKE) harness

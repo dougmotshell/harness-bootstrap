@@ -6,7 +6,7 @@
 # sensor. See templates/harness/README.md for the per-stack recipe.
 
 .DEFAULT_GOAL := help
-.PHONY: help test lint typecheck format lint-file format-file sync sync-check harness
+.PHONY: help test lint typecheck format lint-file format-file sync sync-check harness harness-gate harness-report
 
 TODO = @printf 'TODO: fill the `%s` target in the Makefile.\n' $@ && exit 1
 
@@ -43,3 +43,9 @@ sync-check:  ## Fail if a generated surface drifted from its source
 
 harness:  ## Score the harness (36 checks, 108 points, levels L0-L4)
 	npx -y harness-score
+
+harness-gate:  ## The same scan as a gate — fails below MIN_LEVEL (default 3)
+	npx -y harness-score --min-level $(or $(MIN_LEVEL),3)
+
+harness-report:  ## Write the scan as markdown and as JSON, for a PR or a baseline
+	npx -y harness-score --md harness-report.md --json > harness-report.json
